@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:ms_test_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: sa
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: false
+
+mstest:
+  persistence:
+    mode: MEMORY
+  step-validation:
+    diffPolicy: ALLOW_SYNTHETIC_FALLBACK
+    impactPolicy: ALLOW_DEFAULT_FALLBACK
+  msinfra:
+    enabled: false

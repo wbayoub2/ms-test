@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${MS_TEST_DB_HOST:postgres}:${MS_TEST_DB_PORT:5432}/${MS_TEST_DB_NAME:ms_test}
+    username: ${MS_TEST_DB_USER:ms_test}
+    password: ${MS_TEST_DB_PASSWORD:ms_test}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+mstest:
+  persistence:
+    mode: POSTGRES
+  step-validation:
+    diffPolicy: ${MS_TEST_STEP_VALIDATION_DIFF_POLICY:ALLOW_SYNTHETIC_FALLBACK}
+    impactPolicy: ${MS_TEST_STEP_VALIDATION_IMPACT_POLICY:ALLOW_DEFAULT_FALLBACK}
+  msinfra:
+    enabled: ${MS_TEST_MS_INFRA_ENABLED:false}
+    baseUrl: ${MS_TEST_MS_INFRA_BASE_URL:http://host.docker.internal:18081}
+    cookie: ${MS_TEST_MS_INFRA_COOKIE:}
+    authorization: ${MS_TEST_MS_INFRA_AUTHORIZATION:}
+    sessionId: ${MS_TEST_MS_INFRA_SESSION_ID:}
+    connectTimeoutMs: ${MS_TEST_MS_INFRA_CONNECT_TIMEOUT_MS:1500}
+    readTimeoutMs: ${MS_TEST_MS_INFRA_READ_TIMEOUT_MS:3000}
+    maxAttempts: ${MS_TEST_MS_INFRA_MAX_ATTEMPTS:2}
+    retryDelayMs: ${MS_TEST_MS_INFRA_RETRY_DELAY_MS:300}
