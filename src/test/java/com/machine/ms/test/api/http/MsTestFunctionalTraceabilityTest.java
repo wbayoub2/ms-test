@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -67,6 +68,20 @@ class MsTestFunctionalTraceabilityTest {
                         .param("branch", "main"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstRedCommit").value("ff89aa10"));
+    }
+
+    @Test
+    void shouldKeepHistoryCardinalityStableForSameLogicalTestAcrossRuns() throws Exception {
+        ingestRun("req-run-a", "ab12cd34", "run_hist_a", "PASSED");
+        ingestRun("req-run-b", "ab12cd34", "run_hist_b", "FAILED");
+
+        mockMvc.perform(get("/api/v1/tests/com.machine.ms.FooServiceTest.shouldCompute/history")
+                        .param("service", "ms-plan")
+                        .param("branch", "main")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.history", hasSize(2)))
+                .andExpect(jsonPath("$.history[0].runId").value("run_hist_b"));
     }
 
     private void ingestCoverage(String requestId, String commit, boolean covered) throws Exception {
