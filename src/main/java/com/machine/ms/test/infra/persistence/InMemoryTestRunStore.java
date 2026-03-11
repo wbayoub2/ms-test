@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryTestRunStore implements TestRunStore {
+public class InMemoryTestRunStore implements TestRunStore, ResettableInMemoryStore {
 
     private final Map<String, TestRunSnapshot> byRunId = new ConcurrentHashMap<>();
 
@@ -36,5 +36,10 @@ public class InMemoryTestRunStore implements TestRunStore {
         return byRunId.values().stream()
                 .sorted((a, b) -> b.ingestedAt().compareTo(a.ingestedAt()))
                 .toList();
+    }
+
+    @Override
+    public void reset() {
+        byRunId.clear();
     }
 }

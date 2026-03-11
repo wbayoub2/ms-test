@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryGateReportStore implements GateReportStore {
+public class InMemoryGateReportStore implements GateReportStore, ResettableInMemoryStore {
 
     private final Map<GateTupleKey, GateReport> byTuple = new ConcurrentHashMap<>();
     private final Map<String, GateTupleKey> tupleByRequestId = new ConcurrentHashMap<>();
@@ -35,5 +35,11 @@ public class InMemoryGateReportStore implements GateReportStore {
         byTuple.put(report.tupleKey(), report);
         tupleByRequestId.put(report.requestId(), report.tupleKey());
         return report;
+    }
+
+    @Override
+    public void reset() {
+        byTuple.clear();
+        tupleByRequestId.clear();
     }
 }

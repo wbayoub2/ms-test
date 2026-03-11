@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryCoverageStore implements CoverageStore {
+public class InMemoryCoverageStore implements CoverageStore, ResettableInMemoryStore {
 
     private final Map<String, CoverageSnapshot> byCommit = new ConcurrentHashMap<>();
 
@@ -36,5 +36,10 @@ public class InMemoryCoverageStore implements CoverageStore {
         return byCommit.values().stream()
                 .sorted((a, b) -> b.ingestedAt().compareTo(a.ingestedAt()))
                 .toList();
+    }
+
+    @Override
+    public void reset() {
+        byCommit.clear();
     }
 }

@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryImpactSnapshotStore implements ImpactSnapshotStore {
+public class InMemoryImpactSnapshotStore implements ImpactSnapshotStore, ResettableInMemoryStore {
 
     private final Map<StepKey, ImpactSnapshot> snapshots = new ConcurrentHashMap<>();
 
@@ -21,5 +21,10 @@ public class InMemoryImpactSnapshotStore implements ImpactSnapshotStore {
     public ImpactSnapshot save(ImpactSnapshot snapshot) {
         snapshots.put(snapshot.key(), snapshot);
         return snapshot;
+    }
+
+    @Override
+    public void reset() {
+        snapshots.clear();
     }
 }

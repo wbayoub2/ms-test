@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryCommitChangeStore implements CommitChangeStore {
+public class InMemoryCommitChangeStore implements CommitChangeStore, ResettableInMemoryStore {
 
     private final Map<String, CommitChangeSnapshot> snapshots = new ConcurrentHashMap<>();
 
@@ -20,6 +20,11 @@ public class InMemoryCommitChangeStore implements CommitChangeStore {
     @Override
     public Optional<CommitChangeSnapshot> findByHeadCommit(String service, String headCommit) {
         return Optional.ofNullable(snapshots.get(key(service, headCommit)));
+    }
+
+    @Override
+    public void reset() {
+        snapshots.clear();
     }
 
     private String key(String service, String headCommit) {

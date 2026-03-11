@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryArtifactLinkStore implements ArtifactLinkStore {
+public class InMemoryArtifactLinkStore implements ArtifactLinkStore, ResettableInMemoryStore {
 
     private final Map<String, ArtifactLinkSnapshot> byRunId = new ConcurrentHashMap<>();
 
@@ -20,5 +20,10 @@ public class InMemoryArtifactLinkStore implements ArtifactLinkStore {
     @Override
     public Optional<ArtifactLinkSnapshot> findByRunId(String runId) {
         return Optional.ofNullable(byRunId.get(runId));
+    }
+
+    @Override
+    public void reset() {
+        byRunId.clear();
     }
 }

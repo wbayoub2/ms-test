@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryDiffSnapshotStore implements DiffSnapshotStore {
+public class InMemoryDiffSnapshotStore implements DiffSnapshotStore, ResettableInMemoryStore {
 
     private final Map<StepKey, DiffSnapshot> snapshots = new ConcurrentHashMap<>();
 
@@ -21,5 +21,10 @@ public class InMemoryDiffSnapshotStore implements DiffSnapshotStore {
     public DiffSnapshot save(DiffSnapshot snapshot) {
         snapshots.put(snapshot.key(), snapshot);
         return snapshot;
+    }
+
+    @Override
+    public void reset() {
+        snapshots.clear();
     }
 }
