@@ -58,7 +58,7 @@ class MsInfraIntegrationApiTest {
 
     @Test
     void shouldStartAndPollWithCorrelationAndCookie() throws Exception {
-        mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-123\",\"status\":\"RUNNING\"}", 200));
+        mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-123\",\"status\":\"ACCEPTED\"}", 202));
         mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-123\",\"status\":\"RUNNING\"}", 200));
         mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-123\",\"status\":\"COMPLETED\"}", 200));
 
@@ -75,15 +75,15 @@ class MsInfraIntegrationApiTest {
         RecordedRequest first = mockWebServer.takeRequest(2, TimeUnit.SECONDS);
         RecordedRequest second = mockWebServer.takeRequest(2, TimeUnit.SECONDS);
         RecordedRequest third = mockWebServer.takeRequest(2, TimeUnit.SECONDS);
-        assertRequest(first, "infra.test_run_start");
-        assertRequest(second, "infra.test_run_get");
-        assertRequest(third, "infra.test_run_get");
+        assertStartRequest(first);
+        assertGetRequest(second, "/api/v1/e2e/runs/run-123");
+        assertGetRequest(third, "/api/v1/e2e/runs/run-123");
     }
 
     @Test
     void shouldRetryOnceOnTransientFailure() throws Exception {
         mockWebServer.enqueue(new MockResponse().setResponseCode(500).setBody("{\"error\":\"upstream\"}"));
-        mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-456\",\"status\":\"RUNNING\"}", 200));
+        mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-456\",\"status\":\"ACCEPTED\"}", 202));
         mockWebServer.enqueue(jsonResponse("{\"runId\":\"run-456\",\"status\":\"COMPLETED\"}", 200));
 
         mockMvc.perform(post("/api/v1/integration/ms-infra/test-run/start-and-poll")
@@ -110,16 +110,25 @@ class MsInfraIntegrationApiTest {
                 .setBody(body);
     }
 
-    private void assertRequest(RecordedRequest request, String expectedToolId) {
+    private void assertStartRequest(RecordedRequest request) {
         assertThat(request).isNotNull();
-        assertThat(request.getPath()).isEqualTo("/tools/call");
+        assertThat(request.getPath()).isEqualTo("/api/v1/e2e/runs");
         assertThat(request.getHeader("Cookie")).contains("SESSION=test-cookie");
         assertThat(request.getHeader("Authorization")).isEqualTo("Bearer test-token");
         assertThat(request.getHeader("X-Session-Id")).isEqualTo("session-e2e");
         String outboundRequestId = request.getHeader("X-Request-Id");
         String body = request.getBody().readUtf8();
         assertThat(outboundRequestId).isNotBlank();
-        assertThat(body).contains("\"requestId\":\"" + outboundRequestId + "\"");
-        assertThat(body).contains("\"toolId\":\"" + expectedToolId + "\"");
+        assertThat(body).contains("\"target\":\"full-chain\"");
+        assertThat(body).contains("\"mode\":\"mock\"");
+    }
+
+    private void assertGetRequest(RecordedRequest request, String expectedPath) {
+        assertThat(request).isNotNull();
+        assertThat(request.getPath()).isEqualTo(expectedPath);
+        assertThat(request.getHeader("Cookie")).contains("SESSION=test-cookie");
+        assertThat(request.getHeader("Authorization")).isEqualTo("Bearer test-token");
+        assertThat(request.getHeader("X-Session-Id")).isEqualTo("session-e2e");
+        assertThat(request.getHeader("X-Request-Id")).isNotBlank();
     }
 }

@@ -10,5 +10,7 @@ public interface GateReportStore {
 
     Optional<GateTupleKey> findTupleByRequestId(String requestId);
 
+    Optional<GateReport> findLatestByRunId(String runId);
+
     GateReport save(GateReport report);
 }

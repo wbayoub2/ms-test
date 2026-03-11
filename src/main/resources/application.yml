@@ -8,6 +8,11 @@ server:
 spring:
   application:
     name: ms-test
+  boot:
+    admin:
+      client:
+        enabled: ${SPRING_BOOT_ADMIN_CLIENT_ENABLED:false}
+        url: ${SPRING_BOOT_ADMIN_CLIENT_URL:http://localhost:8089}
   datasource:
     url: jdbc:h2:mem:ms_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     username: sa
@@ -15,6 +20,15 @@ spring:
     driver-class-name: org.h2.Driver
   flyway:
     enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
 
 mstest:
   integration:
@@ -34,3 +48,8 @@ mstest:
     readTimeoutMs: 3000
     maxAttempts: 2
     retryDelayMs: 300
+
+machine:
+  common:
+    sba:
+      service-group: machine-ms

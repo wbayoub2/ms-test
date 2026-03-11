@@ -24,6 +24,13 @@ public class InMemoryGateReportStore implements GateReportStore {
     }
 
     @Override
+    public Optional<GateReport> findLatestByRunId(String runId) {
+        return byTuple.values().stream()
+                .filter(report -> report.tupleKey().runId().equals(runId))
+                .max(java.util.Comparator.comparing(GateReport::evaluatedAt));
+    }
+
+    @Override
     public GateReport save(GateReport report) {
         byTuple.put(report.tupleKey(), report);
         tupleByRequestId.put(report.requestId(), report.tupleKey());
