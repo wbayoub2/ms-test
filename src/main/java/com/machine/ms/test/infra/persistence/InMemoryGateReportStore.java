@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryGateReportStore implements GateReportStore {
+public class InMemoryGateReportStore implements GateReportStore, ResettableInMemoryStore {
 
     private final Map<GateTupleKey, GateReport> byTuple = new ConcurrentHashMap<>();
     private final Map<String, GateTupleKey> tupleByRequestId = new ConcurrentHashMap<>();
@@ -24,9 +24,22 @@ public class InMemoryGateReportStore implements GateReportStore {
     }
 
     @Override
+    public Optional<GateReport> findLatestByRunId(String runId) {
+        return byTuple.values().stream()
+                .filter(report -> report.tupleKey().runId().equals(runId))
+                .max(java.util.Comparator.comparing(GateReport::evaluatedAt));
+    }
+
+    @Override
     public GateReport save(GateReport report) {
         byTuple.put(report.tupleKey(), report);
         tupleByRequestId.put(report.requestId(), report.tupleKey());
         return report;
+    }
+
+    @Override
+    public void reset() {
+        byTuple.clear();
+        tupleByRequestId.clear();
     }
 }

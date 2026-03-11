@@ -1,10 +1,13 @@
 package com.machine.ms.test.infra.integration;
 
+import com.machine.common.api.context.CorrelationIdsDto;
+import com.machine.common.starter.correlation.CorrelationContext;
+import com.machine.common.starter.correlation.CorrelationContextHolder;
+import com.machine.common.starter.http.CommonRestTemplateCustomizer;
 import com.machine.ms.test.core.domain.error.MsTestErrorCode;
 import com.machine.ms.test.core.domain.error.MsTestException;
 import com.machine.ms.test.core.port.out.MsInfraToolPort;
 import com.machine.ms.test.infra.config.MsInfraClientProperties;
-import com.machine.ms.test.infra.observability.CorrelationContext;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -25,28 +28,32 @@ public class MsInfraHttpToolClient implements MsInfraToolPort {
     private final MsInfraClientProperties properties;
     private final RestTemplate restTemplate;
 
-    public MsInfraHttpToolClient(MsInfraClientProperties properties, RestTemplateBuilder restTemplateBuilder) {
+    public MsInfraHttpToolClient(MsInfraClientProperties properties,
+                                RestTemplateBuilder restTemplateBuilder,
+                                CommonRestTemplateCustomizer commonRestTemplateCustomizer) {
         this.properties = properties;
-        this.restTemplate = restTemplateBuilder
+        RestTemplateBuilder tunedBuilder = restTemplateBuilder
                 .setConnectTimeout(Duration.ofMillis(properties.getConnectTimeoutMs()))
-                .setReadTimeout(Duration.ofMillis(properties.getReadTimeoutMs()))
-                .build();
+                .setReadTimeout(Duration.ofMillis(properties.getReadTimeoutMs()));
+        this.restTemplate = commonRestTemplateCustomizer.create(tunedBuilder);
     }
 
     @Override
-    public Map<String, Object> startTestRun(String workflowId, Map<String, Object> inputs, String correlationId) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("workflowId", workflowId);
-        params.put("inputs", inputs == null ? Map.of() : inputs);
-        return callWithRetry("infra.test_run_start", params, correlationId);
+    public Map<String, Object> startTestRun(Map<String, Object> payload, String correlationId) {
+        return callWithRetry("/api/v1/e2e/runs", payload, correlationId, true);
     }
 
     @Override
     public Map<String, Object> getTestRun(String runId, String correlationId) {
-        return callWithRetry("infra.test_run_get", Map.of("runId", runId), correlationId);
+        return callWithRetry("/api/v1/e2e/runs/" + runId, Map.of(), correlationId, false);
     }
 
-    private Map<String, Object> callWithRetry(String toolId, Map<String, Object> params, String correlationId) {
+    @Override
+    public Map<String, Object> getTestRunArtifacts(String runId, String correlationId) {
+        return callWithRetry("/api/v1/e2e/runs/" + runId + "/artifacts", Map.of(), correlationId, false);
+    }
+
+    private Map<String, Object> callWithRetry(String path, Map<String, Object> payload, String correlationId, boolean post) {
         if (!properties.isEnabled()) {
             throw new MsTestException(MsTestErrorCode.UPSTREAM_UNAVAILABLE, "ms-infra integration disabled");
         }
@@ -55,7 +62,7 @@ public class MsInfraHttpToolClient implements MsInfraToolPort {
         String requestId = resolveRequestId(correlationId);
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
-                return postToolsCall(toolPayload(toolId, params, requestId), headers(requestId));
+                return post ? postJson(path, payload, headers(requestId)) : getJson(path, headers(requestId));
             } catch (RestClientException restClientException) {
                 lastFailure = restClientException;
                 sleep(properties.getRetryDelayMs());
@@ -63,12 +70,21 @@ public class MsInfraHttpToolClient implements MsInfraToolPort {
         }
         throw new MsTestException(MsTestErrorCode.UPSTREAM_UNAVAILABLE,
                 "ms-infra call failed after retries",
-                Map.of("toolId", toolId, "reason", lastFailure == null ? "unknown" : lastFailure.getMessage()));
+                Map.of("path", path, "reason", lastFailure == null ? "unknown" : lastFailure.getMessage()));
     }
 
-    private Map<String, Object> postToolsCall(Map<String, Object> payload, HttpHeaders headers) {
+    private Map<String, Object> postJson(String path, Map<String, Object> payload, HttpHeaders headers) {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-        Map<?, ?> raw = restTemplate.postForObject(properties.getBaseUrl() + "/tools/call", request, Map.class);
+        Map<?, ?> raw = restTemplate.postForObject(properties.getBaseUrl() + path, request, Map.class);
+        if (raw == null) {
+            throw new MsTestException(MsTestErrorCode.UPSTREAM_UNAVAILABLE, "ms-infra returned empty response");
+        }
+        return castMap(raw);
+    }
+
+    private Map<String, Object> getJson(String path, HttpHeaders headers) {
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+        Map<?, ?> raw = restTemplate.exchange(properties.getBaseUrl() + path, org.springframework.http.HttpMethod.GET, request, Map.class).getBody();
         if (raw == null) {
             throw new MsTestException(MsTestErrorCode.UPSTREAM_UNAVAILABLE, "ms-infra returned empty response");
         }
@@ -91,14 +107,6 @@ public class MsInfraHttpToolClient implements MsInfraToolPort {
         return headers;
     }
 
-    private Map<String, Object> toolPayload(String toolId, Map<String, Object> params, String requestId) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("requestId", requestId);
-        payload.put("toolId", toolId);
-        payload.put("params", params == null ? Map.of() : params);
-        return payload;
-    }
-
     private Map<String, Object> castMap(Map<?, ?> raw) {
         Map<String, Object> mapped = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : raw.entrySet()) {
@@ -117,11 +125,20 @@ public class MsInfraHttpToolClient implements MsInfraToolPort {
         if (correlationId != null && !correlationId.isBlank()) {
             return correlationId;
         }
-        String requestId = CorrelationContext.getRequestId();
+        CorrelationIdsDto correlationIds = resolveCorrelationIds();
+        String requestId = correlationIds.requestId();
         if (requestId == null || requestId.isBlank()) {
             return generatedRequestId();
         }
         return requestId;
+    }
+
+    private CorrelationIdsDto resolveCorrelationIds() {
+        CorrelationContext context = CorrelationContextHolder.get();
+        if (context == null) {
+            return new CorrelationIdsDto(null, null, null, null, null);
+        }
+        return new CorrelationIdsDto(context.requestId(), context.sessionId(), context.instanceId(), null, null);
     }
 
     private void sleep(long retryDelayMs) {

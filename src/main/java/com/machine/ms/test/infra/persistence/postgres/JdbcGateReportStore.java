@@ -60,6 +60,33 @@ public class JdbcGateReportStore implements GateReportStore {
     }
 
     @Override
+    public Optional<GateReport> findLatestByRunId(String runId) {
+        String sql = """
+                SELECT step_id, phase, base_sha, head_sha, policy_id, run_id, gate_report_id, request_id, status, reasons_json, evaluated_at
+                FROM ms_test_gate_reports
+                WHERE run_id = ?
+                ORDER BY evaluated_at DESC
+                LIMIT 1
+                """;
+        List<GateReport> rows = jdbcTemplate.query(sql, (rs, rowNum) -> new GateReport(
+                        rs.getString("gate_report_id"),
+                        new GateTupleKey(
+                                rs.getString("step_id"),
+                                StepPhase.valueOf(rs.getString("phase")),
+                                rs.getString("base_sha"),
+                                rs.getString("head_sha"),
+                                rs.getString("policy_id"),
+                                rs.getString("run_id")),
+                        rs.getString("request_id"),
+                        GateStatus.valueOf(rs.getString("status")),
+                        jsonMapper.read(rs.getString("reasons_json"), new TypeReference<>() {
+                        }),
+                        rs.getTimestamp("evaluated_at").toInstant()),
+                runId);
+        return rows.stream().findFirst();
+    }
+
+    @Override
     public GateReport save(GateReport report) {
         String sql = """
                 INSERT INTO ms_test_gate_reports(step_id, phase, base_sha, head_sha, policy_id, run_id, gate_report_id, request_id, status, reasons_json, evaluated_at)
