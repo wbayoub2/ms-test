@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state="${1:-}"
+
+# The "prepared" phase is the one that can veto the transaction.
+if [[ "$state" != "prepared" ]]; then
+  exit 0
+fi
+
+while IFS=' ' read -r old_sha new_sha ref_name; do
+  [[ -z "${ref_name:-}" ]] && continue
+  if [[ "$ref_name" == refs/heads/* && "$ref_name" != "refs/heads/main" ]]; then
+    echo "[main-only] ref transaction blocked: '$ref_name' is forbidden (only refs/heads/main allowed)" >&2
+    exit 1
+  fi
+done

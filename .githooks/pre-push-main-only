@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "DETACHED")"
+if [[ "$current_branch" != "main" ]]; then
+  echo "[main-only] push blocked: current branch is '$current_branch' (required: main)" >&2
+  exit 1
+fi
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -z "${local_ref:-}" ]] && continue
+
+  if [[ "$local_ref" == refs/heads/* && "$local_ref" != "refs/heads/main" ]]; then
+    echo "[main-only] push blocked: local ref '$local_ref' is not refs/heads/main" >&2
+    exit 1
+  fi
+
+  if [[ "$remote_ref" == refs/heads/* && "$remote_ref" != "refs/heads/main" ]]; then
+    echo "[main-only] push blocked: remote ref '$remote_ref' is not refs/heads/main" >&2
+    exit 1
+  fi
+done

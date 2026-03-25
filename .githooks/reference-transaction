@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# main-only reference-transaction wrapper
+set -euo pipefail
+
+hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+state="${1:-}"
+input_file="$(mktemp)"
+trap 'rm -f "$input_file"' EXIT
+cat > "$input_file"
+
+"$hook_dir/reference-transaction-main-only" "$state" < "$input_file"
+
+if [[ -x "$hook_dir/reference-transaction.legacy" ]]; then
+  "$hook_dir/reference-transaction.legacy" "$state" < "$input_file"
+fi

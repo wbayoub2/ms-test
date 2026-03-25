@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# main-only wrapper
+set -euo pipefail
+
+hook_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+input_file="$(mktemp)"
+trap 'rm -f "$input_file"' EXIT
+cat > "$input_file"
+
+"$hook_dir/pre-push-main-only" < "$input_file"
+
+if [[ -x "$hook_dir/pre-push.legacy" ]]; then
+  "$hook_dir/pre-push.legacy" < "$input_file"
+fi
