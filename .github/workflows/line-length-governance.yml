@@ -1,0 +1,18 @@
+name: line-length-governance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  max-lines-java-ts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce max 300 lines for Java/TS files
+        run: bash .ci/check_max_file_lines.sh
+
