@@ -1,0 +1,72 @@
+name: Run Tests
+
+on:
+  workflow_call:
+    inputs:
+      scope:
+        required: false
+        type: string
+        default: all
+      with_sonar:
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      scope:
+        required: true
+        type: choice
+        options: [unit, integration, all]
+        default: all
+      with_sonar:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Run selected scope
+        run: |
+          case "${{ inputs.scope }}" in
+            unit) mvn -B test ;;
+            integration) mvn -B -DskipTests failsafe:integration-test failsafe:verify || mvn -B -Dtest='*IT,*IntegrationTest' test ;;
+            all) mvn -B verify ;;
+          esac
+
+
+      - name: Emit test metrics
+        if: always()
+        run: |
+          mkdir -p .ci
+          tests_run="$(grep -Rho 'tests=\"[0-9][0-9]*\"' . 2>/dev/null | sed 's/[^0-9]//g' | awk '{s+=$1} END{print s+0}')"
+          coverage_line_pct="$(awk -F'\"' '/line-rate=/{printf("%.4f",$4*100); exit}' coverage.xml target/site/jacoco/jacoco.xml 2>/dev/null || true)"
+          [ -n "$coverage_line_pct" ] || coverage_line_pct="0.0"
+          printf '{"tests_run":%s,"coverage_line_pct":%s}\n' "${tests_run:-0}" "$coverage_line_pct" > .ci/metrics.normalized.json
+
+      - name: Upload normalized reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-metrics-${{ inputs.scope }}
+          if-no-files-found: ignore
+          path: .ci/metrics.normalized.json
+
+      - name: Validate non-regression thresholds
+        if: always()
+        run: |
+          if [ -f scripts/ci/validate_ci_thresholds.py ] && [ -f config/ci/thresholds/thresholds.global.yaml ]; then
+            python3 scripts/ci/validate_ci_thresholds.py \
+              --root "$PWD" \
+              --threshold-config config/ci/thresholds/thresholds.global.yaml \
+              --strict
+          else
+            echo "Threshold validator/config not present in this repo; skip local threshold check." >> "$GITHUB_STEP_SUMMARY"
+          fi
