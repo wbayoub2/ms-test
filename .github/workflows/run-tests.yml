@@ -28,11 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Bootstrap ms-common local Maven repo
+        uses: wbayoub2/ms-infra/.github/actions/bootstrap-ms-common-maven@main
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
+          ms_common_ref: main
+          java_version: "21"
+          skip_tests: "true"
+          github_token: ${{ secrets.ORG_CI_EVENTS_PAT != '' && secrets.ORG_CI_EVENTS_PAT || github.token }}
+      - name: Maven dependency preflight (clean resolution)
+        run: mvn -B -q -DskipTests dependency:go-offline
       - name: Run selected scope
         run: |
           case "${{ inputs.scope }}" in
